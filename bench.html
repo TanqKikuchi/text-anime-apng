@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Export core benchmark</title>
+    <style>
+      body { margin: 2rem; color: #e8edf2; background: #101419; font: 15px/1.5 ui-monospace, monospace; }
+      button { padding: .6rem 1rem; }
+      pre { padding: 1rem; overflow: auto; background: #182028; border-radius: .5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Export core benchmark</h1>
+    <p>Runs standard and max cases in palette and full colour. Results are also available at <code>window.__bench</code>.</p>
+    <button id="run" type="button">Run again</button>
+    <pre id="output">Starting…</pre>
+    <script type="module" src="/src/bench.ts"></script>
+  </body>
+</html>

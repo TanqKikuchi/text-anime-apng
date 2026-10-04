@@ -1,0 +1,9 @@
+FINAL.md
+PROJECT_RULES.md
+dist/
+docs/copycheck_hits_*
+docs/spec/
+fixtures_out/
+node_modules/
+playwright-report/
+test-results/
