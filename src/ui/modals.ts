@@ -36,6 +36,8 @@ export function buildModals(onClose: (id: ModalId) => void): Record<ModalId, HTM
     list(['help.step1', 'help.step2', 'help.step3', 'help.step4', 'help.step5', 'help.step6'], true),
     h('h3', { text: t('help.tipsHeading') }),
     list(['help.tip1', 'help.tip2', 'help.tip3', 'help.tip4', 'help.tip5', 'help.tip6', 'help.tip7'], false),
+    h('h3', { attrs: { 'data-testid': 'help-keynote' }, text: t('help.keynoteHeading') }),
+    list(['help.keynote1', 'help.keynote2', 'help.keynote3'], false),
   ], () => onClose('help'));
   const notes = dialog('notes', 'notes.title', [
     h('h3', { text: t('notes.localHeading') }),

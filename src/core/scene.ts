@@ -1,5 +1,6 @@
 import type { EasingId } from './easing';
 import { EASING_IDS } from './easing';
+import type { MovQuality } from './export-mov';
 import type { LoopMode } from './timeline';
 
 export type SceneMode = 'message' | 'trailer' | 'place-time';
@@ -185,6 +186,8 @@ export interface ExportSettings {
   readonly loopCount: number;
   readonly autoTrim: boolean;
   readonly includeDefaultImage: boolean;
+  /** Transparent video (.mov) quality (MOV-02). */
+  readonly movQuality: MovQuality;
   /** '' = automatic file name (EXP-22). */
   readonly fileName: string;
 }
@@ -298,7 +301,7 @@ export function createDefaultScene(mode: SceneMode = 'message'): Scene {
       },
     },
     background: { kind: 'none', color: '#000000', opacity: 0.45, syncFade: true },
-    export: { fps: 24, colorMode: 'palette', loop: { kind: 'once' }, loopCount: 3, autoTrim: false, includeDefaultImage: true, fileName: '' },
+    export: { fps: 24, colorMode: 'palette', loop: { kind: 'once' }, loopCount: 3, autoTrim: false, includeDefaultImage: true, movQuality: 'standard', fileName: '' },
   };
 }
 
@@ -526,6 +529,7 @@ export function validateScene(input: Scene | ScenePatch): Scene {
       loopCount: integer(merged.export.loopCount, 1, 999, 3),
       autoTrim: Boolean(merged.export.autoTrim),
       includeDefaultImage: Boolean(merged.export.includeDefaultImage),
+      movQuality: oneOf(merged.export.movQuality, ['high', 'standard'] as const, 'standard'),
       fileName: typeof merged.export.fileName === 'string' ? merged.export.fileName : '',
     },
   };

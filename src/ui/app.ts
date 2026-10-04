@@ -10,6 +10,7 @@ import { ExportPanel } from './exportPanel';
 import { runExport } from './exporter';
 import type { ExportFailure, ExportKind, ExportResult } from './exporter';
 import { FontLoader } from './fonts/loader';
+import { formatLargeSize } from './format';
 import { MyFontStore } from './fonts/myfonts';
 import type { MyFont } from './fonts/catalog';
 import { Gallery } from './gallery';
@@ -633,6 +634,8 @@ export class App {
         return t('error.frameLimit', { n: failure.frames, max: 1800 });
       case 'work-limit':
         return t('error.workLimit');
+      case 'size-limit':
+        return t('error.movSize', { size: formatLargeSize(failure.estimate, getLanguage()), max: formatLargeSize(failure.max, getLanguage()) });
       case 'cancelled':
         return t('status.cancelled');
       case 'error':
@@ -670,7 +673,7 @@ export class App {
     const controller = new AbortController();
     this.exporting = controller;
     this.setLocked(true);
-    this.exportPanel.setBusy(true);
+    this.exportPanel.setBusy(true, kind);
     this.exportPanel.setProgress(0, t('progress.fonts'), kind !== 'png');
     try {
       const result = await runExport({
@@ -689,14 +692,17 @@ export class App {
           } else {
             const text = kind === 'zip'
               ? t('progress.zip', { i: progress.current, n: progress.total })
-              : t(progress.phase === 'analyze' ? 'progress.analyze' : 'progress.encode', { i: progress.current, n: progress.total });
+              : kind === 'mov'
+                ? t('progress.mov', { i: progress.current, n: progress.total })
+                : t(progress.phase === 'analyze' ? 'progress.analyze' : 'progress.encode', { i: progress.current, n: progress.total });
             this.exportPanel.setProgress(progress.percent, text, true);
           }
         },
       });
       if (result.ok) {
         const url = this.exportPanel.showResult(result.output, scene);
-        if (kind !== 'apng') this.triggerDownload(url, result.output.fileName);
+        // APNG and .mov are downloaded from the result panel; PNG / ZIP start automatically.
+        if (kind !== 'apng' && kind !== 'mov') this.triggerDownload(url, result.output.fileName);
         this.exportPanel.setStatus(t('status.done'));
         this.toast('success', t('toast.exported'));
       } else {

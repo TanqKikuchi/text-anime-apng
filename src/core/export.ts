@@ -1,6 +1,7 @@
 import { FrameAnalyzer, type AnalysisResult } from './analysis';
 import { ApngEncoder, type ApngResult } from './apng';
 import { fullRect } from './image';
+import { ExportCancelledError } from './cancel';
 import { assertPixelFrameLimit, createFrameTimeline, type LoopMode } from './timeline';
 
 export type RenderFrame = (time: number) => Uint8ClampedArray | Promise<Uint8ClampedArray>;
@@ -32,12 +33,7 @@ export interface ExportApngResult extends ApngResult {
   readonly analysis: AnalysisResult;
 }
 
-export class ExportCancelledError extends Error {
-  constructor() {
-    super('Export cancelled');
-    this.name = 'ExportCancelledError';
-  }
-}
+export { ExportCancelledError };
 
 function checkCancelled(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new ExportCancelledError();

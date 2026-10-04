@@ -1,14 +1,19 @@
+import { MAX_MOV_BYTES } from '../core/export-mov';
 import { FPS_CHOICES, mergeScene } from '../core/scene';
 import type { FpsChoice, Scene } from '../core/scene';
 import type { LoopMode } from '../core/timeline';
 import { toggleInput } from './controls';
 import type { FieldContext } from './controls';
 import { h, icon, setHidden, setInputValue } from './dom';
+import { movSizeEstimate } from './exporter';
 import type { ExportKind, ExportOutput } from './exporter';
-import { SIZE_WARNING_BYTES, fileNameCandidate, formatSize, infoLine, loopLabel, manualFileName } from './format';
+import { SIZE_WARNING_BYTES, fileNameCandidate, formatLargeSize, formatSize, infoLine, loopLabel, manualFileName } from './format';
 import { getLanguage, t } from './i18n';
 
-/** UI-14 export card (in a panel opened from the top bar), EXP-17 result panel, EXP-22 file name. */
+/**
+ * UI-14 export card (in a panel opened from the top bar), EXP-17 result panel, EXP-22 file name.
+ * MOV-01〜05: the transparent video action has its own section; APNG-only options sit in a section marked "APNG only".
+ */
 
 export interface ExportPanelEvents {
   readonly onExport: (kind: ExportKind) => void;
@@ -30,6 +35,9 @@ export class ExportPanel {
   private readonly resetName: HTMLButtonElement;
   private readonly defaultImage: HTMLInputElement;
   private readonly autoTrim: HTMLInputElement;
+  private readonly movQuality: HTMLSelectElement;
+  private readonly movEstimate: HTMLElement;
+  private readonly apngSection: HTMLElement;
   private readonly buttons: Record<ExportKind, HTMLButtonElement>;
   private readonly progress: HTMLProgressElement;
   private readonly progressWrap: HTMLElement;
@@ -42,6 +50,7 @@ export class ExportPanel {
   private readonly download: HTMLAnchorElement;
   private url: string | null = null;
   private candidate = '';
+  private duration: number | null = null;
 
   constructor(private readonly ctx: FieldContext, private readonly events: ExportPanelEvents) {
     const field = (labelText: string, control: HTMLElement, id: string) =>
@@ -90,13 +99,20 @@ export class ExportPanel {
     });
     this.defaultImage = toggleInput((checked) => this.set({ export: { includeDefaultImage: checked } }), 'export-default-image');
     this.autoTrim = toggleInput((checked) => this.set({ export: { autoTrim: checked } }), 'export-autotrim');
+    this.movQuality = h('select', { id: 'export-mov-quality', attrs: { 'data-testid': 'export-mov-quality' } }, [
+      h('option', { attrs: { value: 'high' }, text: t('export.movHigh') }),
+      h('option', { attrs: { value: 'standard' }, text: t('export.movStandard') }),
+    ]);
+    this.movQuality.addEventListener('change', () => this.set({ export: { movQuality: this.movQuality.value === 'high' ? 'high' : 'standard' } }));
+    this.movEstimate = h('p', { class: 'note', attrs: { 'data-testid': 'export-mov-estimate' } });
 
     this.buttons = {
       apng: h('button', { class: 'btn primary wide', attrs: { type: 'button', 'data-testid': 'export-apng' } }, [icon('download'), t('export.apng')]),
       png: h('button', { class: 'btn', attrs: { type: 'button', 'data-testid': 'export-png' }, text: t('export.png') }),
       zip: h('button', { class: 'btn', attrs: { type: 'button', 'data-testid': 'export-zip' }, text: t('export.zip') }),
+      mov: h('button', { class: 'btn wide', attrs: { type: 'button', 'data-testid': 'export-mov' } }, [icon('download'), t('export.mov')]),
     };
-    for (const kind of ['apng', 'png', 'zip'] as const) this.buttons[kind].addEventListener('click', () => this.events.onExport(kind));
+    for (const kind of ['apng', 'png', 'zip', 'mov'] as const) this.buttons[kind].addEventListener('click', () => this.events.onExport(kind));
 
     this.progress = h('progress', { attrs: { max: 100, value: 0, 'aria-label': t('export.progress'), 'data-testid': 'export-progress' } });
     this.status = h('p', { class: 'status', attrs: { role: 'status', 'aria-live': 'polite', 'data-testid': 'export-status' } });
@@ -123,22 +139,37 @@ export class ExportPanel {
 
     const close = h('button', { class: 'icon-btn', attrs: { type: 'button', 'aria-label': t('export.close'), 'data-testid': 'export-close' } }, [icon('close')]);
     close.addEventListener('click', () => this.events.onClose());
-    this.el = h('aside', { class: 'export-panel', id: 'export-panel', attrs: { 'aria-labelledby': 'export-title', 'data-testid': 'export-panel', hidden: true } }, [
-      h('div', { class: 'export-head' }, [h('h2', { id: 'export-title', text: t('export.heading') }), close]),
-      this.info,
+    const sectionHead = (title: string, badge: string) =>
+      h('div', { class: 'export-section-head' }, [h('h3', { text: title }), h('span', { class: 'badge', text: badge })]);
+    this.apngSection = h('section', { class: 'export-section', attrs: { 'data-testid': 'export-apng-options' } }, [
+      sectionHead(t('export.apngSection'), t('export.apngOnly')),
       h('div', { class: 'export-grid' }, [
-        field(t('export.fps'), this.fps, 'export-fps'),
         field(t('export.loop'), this.loop, 'export-loop'),
         this.countWrap,
         field(t('export.colors'), this.colors, 'export-colors'),
       ]),
+      h('label', { class: 'field field-toggle' }, [this.defaultImage, h('span', { text: t('export.defaultImage') })]),
+      h('label', { class: 'field field-toggle' }, [this.autoTrim, h('span', { text: t('export.autoTrim') })]),
+      this.buttons.apng,
+    ]);
+    const movSection = h('section', { class: 'export-section', attrs: { 'data-testid': 'export-mov-options' } }, [
+      sectionHead(t('export.movSection'), t('export.movOnly')),
+      field(t('export.movQuality'), this.movQuality, 'export-mov-quality'),
+      h('p', { class: 'note', attrs: { 'data-testid': 'export-mov-hint' }, text: t('export.movHint') }),
+      this.movEstimate,
+      this.buttons.mov,
+    ]);
+    this.el = h('aside', { class: 'export-panel', id: 'export-panel', attrs: { 'aria-labelledby': 'export-title', 'data-testid': 'export-panel', hidden: true } }, [
+      h('div', { class: 'export-head' }, [h('h2', { id: 'export-title', text: t('export.heading') }), close]),
+      this.info,
+      h('div', { class: 'export-grid' }, [field(t('export.fps'), this.fps, 'export-fps')]),
       h('div', { class: 'field filename' }, [
         h('div', { class: 'row' }, [h('label', { class: 'field-label', attrs: { for: 'export-filename' }, text: t('export.filename') }), this.autoBadge, this.resetName]),
         this.fileName,
       ]),
-      h('label', { class: 'field field-toggle' }, [this.defaultImage, h('span', { text: t('export.defaultImage') })]),
-      h('label', { class: 'field field-toggle' }, [this.autoTrim, h('span', { text: t('export.autoTrim') })]),
-      h('div', { class: 'export-buttons' }, [this.buttons.apng, h('div', { class: 'row' }, [this.buttons.png, this.buttons.zip])]),
+      this.apngSection,
+      movSection,
+      h('div', { class: 'export-buttons' }, [h('div', { class: 'row' }, [this.buttons.png, this.buttons.zip])]),
       this.progressWrap,
       this.status,
       this.result,
@@ -156,7 +187,10 @@ export class ExportPanel {
   /** `duration` = current timeline length (null = keep the info line). */
   sync(scene: Scene, duration: number | null): void {
     const lang = getLanguage();
-    if (duration !== null) this.info.textContent = infoLine(scene, duration, lang);
+    if (duration !== null) {
+      this.duration = duration;
+      this.info.textContent = infoLine(scene, duration, lang);
+    }
     this.fps.value = String(scene.export.fps);
     this.loop.value = scene.export.loop.kind;
     setHidden(this.countWrap, scene.export.loop.kind !== 'count');
@@ -164,6 +198,8 @@ export class ExportPanel {
     this.colors.value = scene.export.colorMode;
     this.defaultImage.checked = scene.export.includeDefaultImage;
     this.autoTrim.checked = scene.export.autoTrim;
+    this.movQuality.value = scene.export.movQuality;
+    this.syncMovEstimate(scene);
     this.candidate = fileNameCandidate(scene, lang);
     const manual = scene.export.fileName;
     setHidden(this.autoBadge, manual !== '');
@@ -171,12 +207,26 @@ export class ExportPanel {
     if (document.activeElement !== this.fileName) this.fileName.value = manual || this.candidate;
   }
 
+  /** MOV-04: typical size before exporting; the conservative estimate decides whether the 2 GB guard will stop the job. */
+  private syncMovEstimate(scene: Scene): void {
+    if (this.duration === null) return;
+    const lang = getLanguage();
+    const estimate = movSizeEstimate(scene, this.duration);
+    const over = estimate.guard > MAX_MOV_BYTES;
+    this.movEstimate.textContent = over
+      ? t('error.movSize', { size: formatLargeSize(estimate.guard, lang), max: formatLargeSize(MAX_MOV_BYTES, lang) })
+      : t('export.movEstimate', { low: formatLargeSize(estimate.low, lang), high: formatLargeSize(estimate.guard, lang) });
+    this.movEstimate.classList.toggle('warn', over);
+  }
+
   get candidateName(): string {
     return this.candidate;
   }
 
-  setBusy(busy: boolean): void {
+  /** `kind` = running job; a video job dims the APNG-only section (its options do not apply). */
+  setBusy(busy: boolean, kind: ExportKind | null = null): void {
     for (const button of Object.values(this.buttons)) button.disabled = busy;
+    this.apngSection.classList.toggle('inactive', busy && kind === 'mov');
     setHidden(this.progressWrap, !busy);
     if (!busy) this.progress.value = 0;
     this.cancel.disabled = false;
@@ -216,17 +266,34 @@ export class ExportPanel {
       meta = [output.fileName, size, t('result.dimensions', { w: output.width, h: output.height }), t('result.frames', { n: output.sourceFrames, m: output.storedFrames }), colors, loopLabel(scene, lang)];
     } else if (output.kind === 'png') {
       meta = [output.fileName, size, t('result.dimensions', { w: output.width, h: output.height }), t('result.png')];
+    } else if (output.kind === 'mov') {
+      meta = [
+        output.fileName,
+        size,
+        t('result.dimensions', { w: output.width, h: output.height }),
+        t('result.movFrames', { n: output.sourceFrames }),
+        t('result.fps', { fps: output.fps }),
+        t('result.movCodec'),
+        t(output.quality === 'high' ? 'export.movHigh' : 'export.movStandard'),
+        t('result.loopOnce'),
+      ];
     } else {
       meta = [output.fileName, size, t('result.zipFrames', { n: output.sourceFrames }), t('result.fps', { fps: output.fps })];
     }
     this.resultMeta.textContent = meta.join(' ・ ');
-    const showImage = output.kind !== 'zip';
+    // Browsers cannot show ProRes, so the video result has no preview.
+    const showImage = output.kind === 'apng' || output.kind === 'png';
     setHidden(this.resultImage.parentElement!, !showImage);
     if (showImage) this.resultImage.src = this.url;
     const over = output.bytes.length > SIZE_WARNING_BYTES;
-    setHidden(this.resultAdvice, output.kind !== 'apng');
-    this.resultAdvice.textContent = over ? t('result.sizeOver') : t('result.sizeOk');
-    this.resultAdvice.className = `result-advice ${over ? 'warn' : 'ok'}`;
+    setHidden(this.resultAdvice, output.kind !== 'apng' && output.kind !== 'mov');
+    if (output.kind === 'mov') {
+      this.resultAdvice.textContent = t('result.movAdvice');
+      this.resultAdvice.className = 'result-advice';
+    } else {
+      this.resultAdvice.textContent = over ? t('result.sizeOver') : t('result.sizeOk');
+      this.resultAdvice.className = `result-advice ${over ? 'warn' : 'ok'}`;
+    }
     setHidden(this.result, false);
     return this.url;
   }

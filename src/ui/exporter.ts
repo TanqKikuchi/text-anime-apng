@@ -1,6 +1,8 @@
 import { hasDeflateCompression } from '../core/compression';
 import { ExportCancelledError, exportApng } from '../core/export';
 import type { ExportProgress } from '../core/export';
+import { MAX_MOV_BYTES, estimateMovBytes, exportMov, typicalMovBytes } from '../core/export-mov';
+import type { MovQuality } from '../core/export-mov';
 import { exportBaseName, exportFilenames } from '../core/filename';
 import { createSceneModel } from '../core/frame';
 import { encodePng } from '../core/png';
@@ -14,13 +16,14 @@ import type { LayerCanvas } from '../render';
 
 /** Export jobs (EXP-15〜EXP-24) shared by the export panel and the test hook. */
 
-export type ExportKind = 'apng' | 'png' | 'zip';
+export type ExportKind = 'apng' | 'png' | 'zip' | 'mov';
 
 export type ExportFailure =
   | { readonly reason: 'empty' }
   | { readonly reason: 'unsupported' }
   | { readonly reason: 'frame-limit'; readonly frames: number }
   | { readonly reason: 'work-limit' }
+  | { readonly reason: 'size-limit'; readonly estimate: number; readonly max: number }
   | { readonly reason: 'cancelled' }
   | { readonly reason: 'error'; readonly message: string };
 
@@ -35,6 +38,8 @@ export interface ExportOutput {
   readonly storedFrames: number;
   readonly lossless: boolean;
   readonly fps: number;
+  /** Transparent video only. */
+  readonly quality?: MovQuality;
 }
 
 export type ExportResult = { readonly ok: true; readonly output: ExportOutput } | { readonly ok: false; readonly failure: ExportFailure };
@@ -127,6 +132,30 @@ export function checkLimits(scene: Scene, duration: number): ExportFailure | nul
   return null;
 }
 
+/**
+ * MOV-04: size figures before a video export. The shown range is half the typical figure up to the conservative
+ * guard figure (checked against 2 GiB): the bundled templates measured 0.05〜0.32 bytes per pixel-frame (standard).
+ */
+export function movSizeEstimate(scene: Scene, duration: number): { readonly frames: number; readonly low: number; readonly typical: number; readonly guard: number } {
+  const frames = frameCount(duration, scene.export.fps);
+  const { width, height } = scene.canvas;
+  const typical = typicalMovBytes(width, height, frames, scene.export.movQuality);
+  return {
+    frames,
+    low: Math.ceil(typical / 2),
+    typical,
+    guard: estimateMovBytes(width, height, frames, scene.export.movQuality),
+  };
+}
+
+/** MOV-04: frame limit, then the 2 GiB size estimate, then the pixel-frame limit. */
+export function checkMovLimits(scene: Scene, duration: number): ExportFailure | null {
+  const { frames, guard } = movSizeEstimate(scene, duration);
+  if (frames > MAX_EXPORT_FRAMES) return { reason: 'frame-limit', frames };
+  if (guard > MAX_MOV_BYTES) return { reason: 'size-limit', estimate: guard, max: MAX_MOV_BYTES };
+  return checkLimits(scene, duration);
+}
+
 async function canvasPng(rgba: Uint8ClampedArray, width: number, height: number): Promise<Uint8Array> {
   const { canvas, context } = cpuCanvasFactory(width, height);
   context.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
@@ -170,8 +199,28 @@ export async function runExport(options: ExportJobOptions): Promise<ExportResult
       const bytes = await rgbaToPng(rgba, width, height);
       return { ok: true, output: { kind, bytes, fileName: names.still, mime: 'image/png', width, height, sourceFrames: 1, storedFrames: 1, lossless: true, fps } };
     }
-    const limit = checkLimits(scene, duration);
+    const limit = kind === 'mov' ? checkMovLimits(scene, duration) : checkLimits(scene, duration);
     if (limit) return { ok: false, failure: limit };
+    if (kind === 'mov') {
+      const quality = scene.export.movQuality;
+      const result = await exportMov({ width, height, duration, fps, quality, render, signal: options.signal, onProgress: options.onProgress, yieldControl: nextFrame });
+      return {
+        ok: true,
+        output: {
+          kind,
+          bytes: result.bytes,
+          fileName: names.mov,
+          mime: 'video/quicktime',
+          width: result.width,
+          height: result.height,
+          sourceFrames: result.frameCount,
+          storedFrames: result.frameCount,
+          lossless: false,
+          fps,
+          quality,
+        },
+      };
+    }
     if (kind === 'apng') {
       const result = await exportApng({
         width,
@@ -214,6 +263,7 @@ export async function runExport(options: ExportJobOptions): Promise<ExportResult
   } catch (error) {
     if (error instanceof ExportCancelledError || options.signal?.aborted) return { ok: false, failure: { reason: 'cancelled' } };
     const message = error instanceof Error ? error.message : String(error);
+    if (/video size/iu.test(message)) return { ok: false, failure: { reason: 'size-limit', estimate: Number(/(\d+) bytes/u.exec(message)?.[1] ?? MAX_MOV_BYTES), max: MAX_MOV_BYTES } };
     if (/Pixel-frame count/u.test(message)) return { ok: false, failure: { reason: 'work-limit' } };
     if (/Frame count/u.test(message)) return { ok: false, failure: { reason: 'frame-limit', frames: Number(/(\d+)/u.exec(message)?.[1] ?? 0) } };
     return { ok: false, failure: { reason: 'error', message } };

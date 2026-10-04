@@ -60,15 +60,16 @@ export function filenameCandidate(options: FilenameCandidateOptions): string {
 }
 
 export function exportBaseName(manual: string, candidate: string, fallback = 'text-animation'): string {
-  const manualName = sanitizeFilename(manual).replace(/\.(?:apng|png|zip)$/iu, '');
+  const manualName = sanitizeFilename(manual).replace(/\.(?:apng|png|zip|mov)$/iu, '');
   if (manualName.length > 0) return manualName;
-  const candidateName = sanitizeFilename(candidate).replace(/\.(?:apng|png|zip)$/iu, '');
+  const candidateName = sanitizeFilename(candidate).replace(/\.(?:apng|png|zip|mov)$/iu, '');
   return candidateName || fallback;
 }
 
-export function exportFilenames(baseName: string): { apng: string; still: string; frames: string } {
+export function exportFilenames(baseName: string): { apng: string; still: string; frames: string; mov: string } {
   return {
     apng: `${baseName}.png`,
+    mov: `${baseName}.mov`,
     still: `${baseName}_still.png`,
     frames: `${baseName}_frames.zip`,
   };

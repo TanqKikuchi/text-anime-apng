@@ -24,7 +24,8 @@ describe('EXP-22 automatic export filename', () => {
 describe('EXP-23 filename sanitizing and suffixes', () => {
   it('removes unsafe characters, duplicate extensions, and limits length', () => {
     expect(exportBaseName('a/b:c*?.png', 'candidate')).toBe('abc');
-    expect(exportFilenames('abc')).toEqual({ apng: 'abc.png', still: 'abc_still.png', frames: 'abc_frames.zip' });
+    expect(exportFilenames('abc')).toEqual({ apng: 'abc.png', still: 'abc_still.png', frames: 'abc_frames.zip', mov: 'abc.mov' });
+    expect(exportBaseName('clip.mov', 'candidate')).toBe('clip');
     expect(graphemeLength(sanitizeFilename(`.${'a'.repeat(61)}_`))).toBe(60);
     expect(exportBaseName('', '', 'fallback')).toBe('fallback');
   });

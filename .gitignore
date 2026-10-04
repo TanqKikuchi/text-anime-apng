@@ -2,6 +2,7 @@ FINAL.md
 PROJECT_RULES.md
 dist/
 docs/copycheck_hits_*
+docs/ref/
 docs/spec/
 fixtures_out/
 node_modules/

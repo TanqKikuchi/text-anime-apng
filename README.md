@@ -9,6 +9,7 @@ Browser-only tool that turns text into animated PNG (APNG) clips: cut-ins, trail
 - 46 original templates (30 message cut-ins in 8 categories, 8 trailers, 8 place/time captions) with live mini previews
 - 88 Google Fonts with Japanese / Hangul fallbacks, plus your own font files or installed fonts
 - Export: APNG (256 colours or full colour, loop control, auto trim, still fallback), still PNG, PNG sequence (ZIP)
+- Transparent video for Keynote: ProRes 4444 with alpha in a QuickTime .mov (high / standard quality, size estimate, plays once — loop it in Keynote), encoded in the browser
 - Japanese / English / Korean UI, light / dark theme, keyboard shortcuts, settings persistence, phone layout with a bottom sheet
 
 ## Development

@@ -14,7 +14,8 @@ export interface TanimHook {
   applyTemplate(id: string): void;
   listTemplates(): { id: string; mode: string; category: string; system?: string; names: Record<string, string> }[];
   renderRgba(t: number): Promise<{ width: number; height: number; data: string }>;
-  frameTimes(): number[];
+  /** Source frame times; APNG may store fewer frames (duplicates merged), .mov stores every one of them. */
+  frameTimes(kind?: ExportKind): number[];
   exportBytes(kind: ExportKind): Promise<string>;
   fontsReady(): Promise<boolean>;
 }
@@ -50,7 +51,8 @@ export function installTestHook(app: App): void {
       const png = await rgbaToPng(rgba, scene.canvas.width, scene.canvas.height);
       return { width: scene.canvas.width, height: scene.canvas.height, data: toBase64(png) };
     },
-    frameTimes() {
+    frameTimes(_kind = 'apng') {
+      // APNG, ZIP and .mov all sample the same timeline (MOV-06: the video keeps every source frame).
       const scene = app.scene;
       const timeline = sceneTimeline(scene, app.loader.fontFamily);
       return [...createFrameTimeline(timeline.duration, scene.export.fps).times];

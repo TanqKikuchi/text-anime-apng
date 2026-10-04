@@ -206,3 +206,32 @@ All decorations (both writing modes, DEC-20 on) and all backgrounds also render 
 | STO-04 | `FNT-07 / FNT-08 / STO-04 registered fonts` | persistence › `FNT-07 / STO-04 / FNT-09 …` |
 
 Additional E2E: app › `accessibility: visible form controls have accessible names` (all five settings groups).
+
+## MOV — transparent video export (D-08; not part of docs/spec)
+
+| Area | Unit (`tests/unit/MOV-prores.test.ts`) | Other |
+|---|---|---|
+| VLC (RDD 36 §7.1.1) | `MOV-PR-01 variable-length codes` | — |
+| Alpha RLE (§7.1.2) | `MOV-PR-02 alpha run-length coding` | — |
+| Scan / qScale / slice layout / frame rate code | `MOV-PR-03 scan, quantization and slice tables` | — |
+| Forward DCT | `MOV-PR-04 forward DCT` | — |
+| Colour conversion, transparent fill | `MOV-PR-05 RGB → Y′CbCr` | — |
+| Frame syntax | `MOV-PR-06 ProRes 4444 frame syntax` | — |
+| Encode → independent decode (`tests/unit/helpers/prores-decoder.ts`) | `MOV-PR-07 encode → independent decode` | `node tools/make_test_mov.ts <dir>` + `swift tools/verify_mov.swift` (AVFoundation) |
+| QuickTime container | `MOV-QT-01 QuickTime container` | AVFoundation `isPlayable`, codec `ap4h`, frame count, duration |
+| Export job (progress, cancel, guards) | `MOV-EXP-01 exportMov` | — |
+
+### MOV — app integration (Task 5)
+
+IDs defined for the UI wiring of the transparent video export (no docs/spec section; behaviour per D-08).
+
+| ID | Behaviour | Unit (`tests/unit/MOV-UI.test.ts`) | E2E (`tests/e2e/mov.spec.ts`) |
+|---|---|---|---|
+| MOV-01 | Export panel: fourth action 「透過動画 (.mov・Keynote 用)」 in its own section; APNG-only options (loop, count, colours, still image, auto trim) in a section marked 「APNG のみ」 and dimmed during a video export; FPS / canvas size / file name shared | — | `MOV-01 / MOV-02: APNG-only options are marked …`, `MOV-01 / MOV-03 / MOV-05 / MOV-06: the video export …` |
+| MOV-02 | Quality select 高画質 / 標準 (`high` / `standard`, default standard), stored in `scene.export.movQuality`, persisted and shared like the other export settings | `MOV-02 video quality setting` | `MOV-01 / MOV-02: … the quality select persists across reload` |
+| MOV-03 | File name: EXP-22 auto-fill / manual rules with `.mov` | `MOV-03 video file name`; `EXP-23 filename sanitizing and suffixes` | `MOV-01 / MOV-03 / MOV-05 / MOV-06 …` |
+| MOV-04 | Size estimate shown before exporting (range: half the measured typical rate … conservative guard rate, × pixels × frames); frame limit (1,800) first, then jobs projected above 2 GB are refused with a message, then the pixel-frame limit | `MOV-04 size estimate and guards` | `MOV-04: jobs projected above 2 GB are refused before rendering` |
+| MOV-05 | Progress 「動画を作成中… i / n」, cancel within ~1 s (buffers dropped), result panel (name ・ size ・ size px ・ frames ・ FPS ・ ProRes 4444 ・ quality ・ plays once) with download, Keynote advice, no image preview | — | `MOV-05: a video export can be cancelled within about a second …`, `MOV-01 / MOV-03 / MOV-05 / MOV-06 …` |
+| MOV-06 | Output: QuickTime `ftyp` brand `qt  `, `ap4h` sample entry, one sample per source frame; test hook `exportBytes('mov')` (base64) and `frameTimes('mov')` | MOV-QT-01 / MOV-EXP-01 (Task 4) | `MOV-01 / MOV-03 / MOV-05 / MOV-06 …` |
+| MOV-07 | Strings in ja / en / ko (typecheck parity); help section 「Keynote で使う」 | `MOV-07 strings` | `MOV-07: the help dialog explains how to use the video in Keynote`; app › `UI-01 / I18N-02 …` (no raw keys) |
+

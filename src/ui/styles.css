@@ -322,6 +322,10 @@ p { margin: 0; }
 .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .filename .row { gap: 6px; }
 .badge.auto { background: var(--accent-soft); }
+.export-section { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; transition: opacity .15s; }
+.export-section-head { display: flex; align-items: center; gap: 8px; }
+.export-section-head h3 { font-size: 13px; }
+.export-section.inactive { opacity: .45; }
 .export-buttons { display: flex; flex-direction: column; gap: 8px; }
 .export-buttons .row .btn { flex: 1 1 0; }
 .progress-wrap { display: flex; align-items: center; gap: 8px; }

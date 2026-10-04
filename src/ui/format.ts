@@ -14,6 +14,12 @@ export function formatSize(bytes: number, lang: Lang): string {
   return translate(lang, 'result.sizeKb', { v: Math.max(1, Math.round(bytes / 1024)) });
 }
 
+/** MOV-04: like `formatSize`, but ≥ 1 GiB is shown in GB ("2 GB", "1.5 GB"). */
+export function formatLargeSize(bytes: number, lang: Lang): string {
+  if (bytes >= 1024 ** 3) return translate(lang, 'result.sizeGb', { v: Number((bytes / 1024 ** 3).toFixed(2)) });
+  return formatSize(bytes, lang);
+}
+
 /** EXP-26 info line. */
 export function infoLine(scene: Scene, duration: number, lang: Lang): string {
   return translate(lang, 'export.info', {
