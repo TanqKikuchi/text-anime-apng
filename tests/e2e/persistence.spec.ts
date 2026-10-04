@@ -52,7 +52,7 @@ test.describe('STO-01 without storage', () => {
     await page.addInitScript(() => {
       Object.defineProperty(window, 'localStorage', { configurable: true, get: () => { throw new Error('blocked'); } });
     });
-    await page.goto('/');
+    await page.goto('./');
     await page.waitForFunction(() => window.__tanim !== undefined);
     await waitFonts(page);
     await page.getByTestId('main-text').fill('保存できなくても動く');

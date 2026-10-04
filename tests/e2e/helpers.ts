@@ -38,7 +38,7 @@ export async function gotoApp(page: Page, options: GotoOptions = {}): Promise<Ap
       }
     }, options.storage ?? null);
   }
-  await page.goto('/');
+  await page.goto('./');
   await page.waitForFunction(() => window.__tanim !== undefined);
   if (options.waitFonts !== false) await waitFonts(page);
   return { errors };
