@@ -50,7 +50,7 @@ export class Gallery {
       this.systemRow,
       this.grid,
     ]);
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => this.reserveHeight()).observe(this.grid);
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => requestAnimationFrame(() => this.reserveHeight())).observe(this.grid);
   }
 
   private thumbScene(template: TemplateDef): Scene {

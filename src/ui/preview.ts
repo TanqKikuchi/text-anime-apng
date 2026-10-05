@@ -121,7 +121,7 @@ export class Preview {
       if (document.hidden) this.pause();
     });
     if (typeof ResizeObserver !== 'undefined') {
-      new ResizeObserver(() => this.resize()).observe(this.el);
+      new ResizeObserver(() => requestAnimationFrame(() => this.resize())).observe(this.el);
     }
     window.addEventListener('resize', () => this.resize());
   }
