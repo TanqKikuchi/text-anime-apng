@@ -4,6 +4,7 @@ import type { Scene, SceneMode } from '../core/scene';
 import { firstTemplate, getTemplate, relocalizeSample, templateName } from '../templates';
 import type { RollSystem, TemplateCategory, TemplateDef } from '../templates';
 import type { FieldContext, UpdateOptions } from './controls';
+import { AiPanel } from './aiPanel';
 import { h, icon, setPressed } from './dom';
 import { BottomSheet } from './sheet';
 import { ExportPanel } from './exportPanel';
@@ -70,6 +71,7 @@ export class App {
   private gallery!: Gallery;
   private settings!: SettingsPanel;
   private exportPanel!: ExportPanel;
+  private aiPanel!: AiPanel;
   private sheet!: BottomSheet;
   private modals!: Record<ModalId, HTMLDialogElement>;
   private modeTabs: HTMLButtonElement[] = [];
@@ -203,6 +205,13 @@ export class App {
       onOpenNotes: () => this.openModal('notes'),
     });
 
+    this.aiPanel = new AiPanel({
+      state: () => this.state,
+      apply: (state) => this.applyAiState(state),
+      knownFont: (family) => this.loader.isKnownFamily(family),
+      busy: () => this.exporting !== null,
+    }, this.storage);
+
     this.modals = buildModals((id) => this.headerButtons.get(id)?.setAttribute('aria-expanded', 'false'));
 
     this.header = this.buildHeader();
@@ -218,7 +227,8 @@ export class App {
     }), () => window.scrollTo({ top: 0 }));
     this.rightColumn.append(this.sheet.band, sheetBody);
     const center = h('div', { class: 'col col-center' }, [this.preview.el]);
-    this.workspace = h('main', { class: 'workspace', id: 'main', attrs: { tabindex: -1 } }, [this.leftColumn, center, this.rightColumn]);
+    const aiColumn = h('div', { class: 'col col-ai' }, [this.aiPanel.el]);
+    this.workspace = h('main', { class: 'workspace', id: 'main', attrs: { tabindex: -1 } }, [this.leftColumn, center, this.rightColumn, aiColumn]);
     const footer = this.buildFooter();
     this.fab = h('button', { class: 'fab btn primary', attrs: { type: 'button', 'data-testid': 'fab-export', 'aria-controls': 'export-panel' } }, [icon('export'), t('header.export')]);
     this.fab.addEventListener('click', () => this.setExportOpen(!this.exportPanel.open));
@@ -422,6 +432,15 @@ export class App {
       this.syncUi();
       this.requestFonts(false);
     }
+  }
+
+  /** Replaces the whole state with one produced by the AI assistant (or its undo). */
+  private applyAiState(state: AppState): void {
+    if (this.exporting) return;
+    this.setState(state);
+    this.preview.setScene(this.scene, { restart: true });
+    this.syncUi();
+    this.requestFonts(false);
   }
 
   // ── templates & modes ──
